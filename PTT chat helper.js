@@ -2,7 +2,7 @@
 // @name         UNIT3D chatbox - polishtorrent.top edition
 // @author       mehech
 // @version      1.0
-// @description  BBCode/chat helper panel for polishtorrent.top
+// @description  BBCode panel, hides "is typing...", no reply/PM for bots, action buttons after user icons, adds @mention button
 // @match        https://polishtorrent.top/*
 // @grant        none
 // @license      MIT
@@ -15,7 +15,7 @@
     // List of usernames considered bots; no reply/PM buttons for these
     const BOTNICKS = ['SYSTEM', 'NERDBOT'];
 
-    // Custom colors for specific usernames in reply quotes
+    // Custom colors for specific usernames in reply quotes and mentions
     const USER_COLORS = {
         'ace': '#ef008c',
         'TheoneandonlyPook': '#ef008c',
@@ -173,11 +173,11 @@
         });
     }
 
-    // Add reply and private message buttons next to usernames in chat, but NOT for bots
+    // Add reply, mention (@), and private message buttons next to usernames in chat, but NOT for bots
     function addReplyButtonsEach() {
         // Remove any previous enhancements
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
-        // For each chat user address, add reply/PM, unless bot
+        // For each chat user address, add reply/PM/mention, unless bot
         document.querySelectorAll('address.chatbox-message__address.user-tag').forEach(address => {
             if (!address) return;
             const link = address.querySelector('.user-tag__link');
@@ -192,12 +192,41 @@
             if (!rootMsg) rootMsg = address.parentNode;
             const contentSection = rootMsg.querySelector('.chatbox-message__content, section.bbcode-rendered');
             const content = contentSection ? contentSection.innerText.trim() : '';
+
+            // Mention (@) button
+            const atBtn = document.createElement('button');
+            atBtn.className = 'enh-chat-btn-action';
+            atBtn.textContent = '@';
+            atBtn.title = 'Mention user';
+            atBtn.style.marginLeft = '5px';
+            atBtn.onclick = function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                const chatbox = document.querySelector('#chatbox__messages-create');
+                if (!chatbox) return;
+                let userColor = '#ecc846';
+                if (USER_COLORS.hasOwnProperty(username)) {
+                    userColor = USER_COLORS[username];
+                } else {
+                    // Fetch user color from style if not defined
+                    const msgUsername = Array.from(document.querySelectorAll('.chatbox-message__address.user-tag span, .message-username span'))
+                        .find(el => el.textContent.trim() === username);
+                    if (msgUsername) {
+                        const style = window.getComputedStyle(msgUsername);
+                        userColor = rgbToHex(style.color);
+                    }
+                }
+                const mentionText = `[color=${userColor}]@${username}[/color] `;
+                chatbox.value += mentionText;
+                chatbox.focus();
+            };
+
             // Reply (quote) button
             const reply = document.createElement('button');
             reply.className = 'enh-chat-btn-action';
             reply.textContent = '↩️';
             reply.title = 'Reply';
-            reply.style.marginLeft = '5px';
+            reply.style.marginLeft = '2px';
             reply.onclick = function(event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -234,7 +263,7 @@
                 window.open(url, '_blank');
             };
 
-            // Insert reply/PM after ALL user icons (e.g., custom, donor, etc.)
+            // Insert custom buttons after ALL user icons (e.g., custom, donor, etc.)
             let insertAfter = span;
             let node = span.nextSibling;
             while (
@@ -253,11 +282,13 @@
                 insertAfter = node;
                 node = node.nextSibling;
             }
-            // Insert buttons after the last icon/decorator
+            // Order: @, reply, PM
             if (insertAfter.nextSibling) {
-                insertAfter.parentNode.insertBefore(reply, insertAfter.nextSibling);
+                insertAfter.parentNode.insertBefore(atBtn, insertAfter.nextSibling);
+                insertAfter.parentNode.insertBefore(reply, atBtn.nextSibling);
                 insertAfter.parentNode.insertBefore(msg, reply.nextSibling);
             } else {
+                insertAfter.parentNode.appendChild(atBtn);
                 insertAfter.parentNode.appendChild(reply);
                 insertAfter.parentNode.appendChild(msg);
             }
