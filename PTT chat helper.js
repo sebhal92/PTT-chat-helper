@@ -197,6 +197,7 @@
             reply.className = 'enh-chat-btn-action';
             reply.textContent = '↩️';
             reply.title = 'Reply';
+            reply.style.marginLeft = '5px';
             reply.onclick = function(event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -223,6 +224,7 @@
             msg.className = 'enh-chat-btn-action';
             msg.textContent = '✉️';
             msg.title = 'Private message';
+            msg.style.marginLeft = '2px';
             msg.onclick = function(event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -231,7 +233,34 @@
                 const url = `/users/${myUsername}/conversations/create?username=${encodeURIComponent(username)}`;
                 window.open(url, '_blank');
             };
-            span.after(reply, msg);
+
+            // Insert reply/PM after ALL user icons (e.g., custom, donor, etc.)
+            let insertAfter = span;
+            let node = span.nextSibling;
+            while (
+                node &&
+                (node.nodeType === 1 || node.nodeType === 3) && // element or text node
+                (
+                    (node.nodeType === 1 && (
+                        node.tagName === 'IMG' ||
+                        node.tagName === 'SPAN' ||
+                        node.tagName === 'I' ||
+                        node.tagName === 'SVG'
+                    )) ||
+                    (node.nodeType === 3 && node.textContent.trim() === '')
+                )
+            ) {
+                insertAfter = node;
+                node = node.nextSibling;
+            }
+            // Insert buttons after the last icon/decorator
+            if (insertAfter.nextSibling) {
+                insertAfter.parentNode.insertBefore(reply, insertAfter.nextSibling);
+                insertAfter.parentNode.insertBefore(msg, reply.nextSibling);
+            } else {
+                insertAfter.parentNode.appendChild(reply);
+                insertAfter.parentNode.appendChild(msg);
+            }
         });
     }
 
