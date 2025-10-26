@@ -305,6 +305,13 @@
     `;
     document.head.appendChild(style);
 
+	// Hideing „nick writing…”
+    const hideTypingStyle = document.createElement('style');
+    hideTypingStyle.innerHTML = `
+    .chatbox__typing, .chatbox-typing, .typing-indicator {
+        display: none !important;
+    }
+    `;
+    document.head.appendChild(hideTypingStyle);
     init();
 })();
-
