@@ -5,6 +5,8 @@
 // @description  BBCode/chat helper panel for polishtorrent.top
 // @match        https://polishtorrent.top/*
 // @grant        none
+// @license      MIT
+// @namespace    PTTchathelper
 // ==/UserScript==
 
 (function () {
@@ -305,3 +307,4 @@
 
     init();
 })();
+
