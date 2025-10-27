@@ -2,7 +2,7 @@
 // @name         UNIT3D chatbox - polishtorrent.top edition
 // @author       mehech
 // @version      1.0
-// @description  BBCode panel, hides "is typing...", no reply/PM for bots, action buttons after user icons, adds @mention button
+// @description  BBCode panel chat helper for PTT
 // @match        https://polishtorrent.top/*
 // @grant        none
 // @license      MIT
@@ -12,24 +12,20 @@
 (function () {
     'use strict';
 
-    // List of usernames considered bots; no reply/PM buttons for these
     const BOTNICKS = ['SYSTEM', 'NERDBOT'];
 
-    // Custom colors for specific usernames in reply quotes and mentions
     const USER_COLORS = {
         'ace': '#ef008c',
         'TheoneandonlyPook': '#ef008c',
         'Demonic': '#ffac6b'
     };
 
-    // Convert RGB color string to HEX format
     function rgbToHex(rgb) {
         const rgbArray = rgb.match(/\d+/g);
         if (!rgbArray || rgbArray.length !== 3) return rgb;
         return `#${rgbArray.map(v => Number(v).toString(16).padStart(2, '0')).join('')}`;
     }
 
-    // Extract currently logged-in username from the site nav
     function extractUser() {
         const userLink = document.querySelector('a.top-nav__username--highresolution');
         if (userLink) {
@@ -39,7 +35,6 @@
         return null;
     }
 
-    // Build and inject the BBCode panel above the chat message form
     function setupBBCodePanel(chatbox) {
         if (!chatbox) return false;
         if (document.getElementById('bbCodesPanelContainer')) return true;
@@ -53,6 +48,7 @@
                 <button type="button" class="bbc-btn" data-bbcode="[u][/u]" title="Underline"><span style="text-decoration:underline">U</span></button>
                 <button type="button" class="bbc-btn" id="imgButton" data-bbcode="[img][/img]" title="Add image">IMG</button>
                 <button type="button" class="bbc-btn" id="urlButton" data-bbcode="[url][/url]" title="Add URL">URL</button>
+                <button type="button" class="bbc-btn" id="videoButton" title="Add YouTube video">VIDEO</button>
                 <button type="button" class="bbc-btn" id="colorButton" title="Insert color BBCode">Color</button>
                 <input type="color" id="colorPicker" style="cursor:pointer;margin-left:4px;display:none;width:18px;height:16px;background:none;border:none;" title="Select Color">
                 <button type="button" class="bbc-btn" id="emojiButton" title="Insert emoji" style="font-size:17px;">😊</button>
@@ -69,46 +65,50 @@
             </div>
         `;
 
-        // Try to insert the panel above the main chat actions or input
         let parent = chatbox.closest('form, .chatbox__footer, .chatbox__form, .chatbox__actions, .chatbox');
         if (parent && parent !== chatbox && parent.parentElement) {
             parent.parentElement.insertBefore(container, parent);
         } else {
-            // Fallback: place directly above input if previous container is not found
             chatbox.before(container);
         }
 
-        // Attach event handlers to BBCode panel buttons
         container.querySelectorAll('.bbc-btn[data-bbcode]').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', () => {
                 const bbCode = btn.getAttribute('data-bbcode');
                 if (!bbCode) return;
-                if (bbCode === "[img][/img]") insertImgBBCodeWithClipboard(bbCode, chatbox);
-                else if (bbCode === "[url][/url]") insertBBCodeWithClipboard(bbCode, chatbox);
+                if (bbCode === '[img][/img]') insertImgBBCodeWithClipboard(bbCode, chatbox);
+                else if (bbCode === '[url][/url]') insertBBCodeWithClipboard(bbCode, chatbox);
                 else insertBBCode(chatbox, bbCode);
             });
         });
+
+        container.querySelector('#videoButton').addEventListener('click', () => {
+            insertVideoBBCodeWithClipboard(chatbox);
+        });
+
         container.querySelector('#colorButton').addEventListener('click', () => {
             document.getElementById('colorPicker').style.display = 'inline-block';
         });
+
         container.querySelector('#colorPicker').addEventListener('input', e => {
             const color = e.target.value;
-            const colorBBCode = `[color=${color}][/color]`;
-            chatbox.value += colorBBCode + " ";
+            chatbox.value += `[color=${color}][/color] `;
             chatbox.focus();
             document.getElementById('colorPicker').style.display = 'none';
         });
+
         container.querySelector('#emojiButton').addEventListener('click', () => {
             const menu = document.getElementById('emojiMenu');
             menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
         });
+
         container.querySelector('#emojiMenu').addEventListener('click', e => {
             if (e.target.classList.contains('emoji')) {
-                const emoji = e.target.getAttribute('data-emoji');
-                insertEmoji(emoji, chatbox);
+                insertEmoji(e.target.getAttribute('data-emoji'), chatbox);
                 document.getElementById('emojiMenu').style.display = 'none';
             }
         });
+
         document.addEventListener('click', e => {
             const menu = document.getElementById('emojiMenu');
             const btn = document.getElementById('emojiButton');
@@ -116,10 +116,10 @@
                 menu.style.display = 'none';
             }
         });
+
         return true;
     }
 
-    // Insert emoji at the cursor position in textbox
     function insertEmoji(emoji, chatbox) {
         const pos = chatbox.selectionStart || chatbox.value.length;
         chatbox.value = chatbox.value.substring(0, pos) + emoji + chatbox.value.substring(pos);
@@ -127,63 +127,87 @@
         chatbox.focus();
     }
 
-    // Insert simple BBCode with/without selected text
     function insertBBCode(chatbox, bbCode) {
         const textSelected = chatbox.value.substring(chatbox.selectionStart, chatbox.selectionEnd);
         const startTag = bbCode.substring(0, bbCode.indexOf(']') + 1);
         const endTag = bbCode.substring(bbCode.lastIndexOf('['));
         if (textSelected.length > 0) {
             const newText = startTag + textSelected + endTag;
-            chatbox.value = chatbox.value.substring(0, chatbox.selectionStart) + newText + " " + chatbox.value.substring(chatbox.selectionEnd);
+            chatbox.value = chatbox.value.substring(0, chatbox.selectionStart) + newText + ' ' + chatbox.value.substring(chatbox.selectionEnd);
             const newPos = chatbox.value.lastIndexOf(' ') + 1;
             chatbox.setSelectionRange(newPos, newPos);
         } else {
             const pos = chatbox.selectionStart + startTag.length;
-            chatbox.value += startTag + endTag + " ";
+            chatbox.value += startTag + endTag + ' ';
             chatbox.setSelectionRange(pos, pos);
         }
         chatbox.focus();
     }
 
-    // Insert BBCode with clipboard content inside
     function insertBBCodeWithClipboard(tag, chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const newContent = clipText.trim().length > 0
                 ? tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1${clipText}$3`)
                 : tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1$2$3`);
-            chatbox.value += newContent + " ";
+            chatbox.value += newContent + ' ';
             chatbox.focus();
         }).catch(() => {
-            chatbox.value += tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1$2$3`) + " ";
+            chatbox.value += tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1$2$3`) + ' ';
             chatbox.focus();
         });
     }
 
-    // Insert [img] BBCode with clipboard content
     function insertImgBBCodeWithClipboard(tag, chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const newContent = clipText.trim().length > 0
                 ? tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1${clipText}$3`)
                 : tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1$2$3`);
-            chatbox.value += newContent + "\n";
+            chatbox.value += newContent + '\n';
             chatbox.focus();
         }).catch(() => {
-            chatbox.value += tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1$2$3`) + "\n";
+            chatbox.value += tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1$2$3`) + '\n';
             chatbox.focus();
         });
     }
 
-    // Add reply, mention (@), and private message buttons next to usernames in chat, but NOT for bots
+    function insertVideoBBCodeWithClipboard(chatbox) {
+        navigator.clipboard.readText().then(clipText => {
+            const ytLink = clipText.trim();
+            let videoId = '';
+
+            // Extract video ID from youtu.be link
+            if (ytLink.match(/^https:\/\/youtu\.be\//)) {
+                videoId = ytLink.split('/').pop();
+            }
+            // Extract video ID from youtube.com watch?v= link
+            else if (ytLink.match(/youtube\.com\/watch\?v=/)) {
+                try {
+                    const urlParams = new URLSearchParams((new URL(ytLink)).search);
+                    videoId = urlParams.get('v') || '';
+                } catch {
+                    videoId = '';
+                }
+            }
+
+            if (videoId) {
+                chatbox.value += `[youtube]${videoId}[/youtube] `;
+            } else {
+                chatbox.value += `[youtube]${ytLink}[/youtube] `;
+            }
+            chatbox.focus();
+        }).catch(() => {
+            chatbox.value += '[youtube][/youtube] ';
+            chatbox.focus();
+        });
+    }
+
     function addReplyButtonsEach() {
-        // Remove any previous enhancements
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
-        // For each chat user address, add reply/PM/mention, unless bot
         document.querySelectorAll('address.chatbox-message__address.user-tag').forEach(address => {
             if (!address) return;
             const link = address.querySelector('.user-tag__link');
             const span = link && link.querySelector('span');
             if (!link || !span) return;
-            // Use trimmed, lowercased usernames for reliable bot detection
             const username = span.textContent.trim();
             const isBot = BOTNICKS.some(bot => bot.toLowerCase() === username.toLowerCase());
             if (!username || isBot) return;
@@ -193,7 +217,6 @@
             const contentSection = rootMsg.querySelector('.chatbox-message__content, section.bbcode-rendered');
             const content = contentSection ? contentSection.innerText.trim() : '';
 
-            // Mention (@) button
             const atBtn = document.createElement('button');
             atBtn.className = 'enh-chat-btn-action';
             atBtn.textContent = '@';
@@ -208,7 +231,6 @@
                 if (USER_COLORS.hasOwnProperty(username)) {
                     userColor = USER_COLORS[username];
                 } else {
-                    // Fetch user color from style if not defined
                     const msgUsername = Array.from(document.querySelectorAll('.chatbox-message__address.user-tag span, .message-username span'))
                         .find(el => el.textContent.trim() === username);
                     if (msgUsername) {
@@ -221,7 +243,6 @@
                 chatbox.focus();
             };
 
-            // Reply (quote) button
             const reply = document.createElement('button');
             reply.className = 'enh-chat-btn-action';
             reply.textContent = '↩️';
@@ -236,7 +257,6 @@
                 if (USER_COLORS.hasOwnProperty(username)) {
                     userColor = USER_COLORS[username];
                 } else {
-                    // Fetch user color from style if not defined
                     const msgUsername = Array.from(document.querySelectorAll('.chatbox-message__address.user-tag span, .message-username span'))
                         .find(el => el.textContent.trim() === username);
                     if (msgUsername) {
@@ -248,7 +268,7 @@
                 chatbox.value += quoteText;
                 chatbox.focus();
             };
-            // Private message button
+
             const msg = document.createElement('button');
             msg.className = 'enh-chat-btn-action';
             msg.textContent = '✉️';
@@ -263,12 +283,11 @@
                 window.open(url, '_blank');
             };
 
-            // Insert custom buttons after ALL user icons (e.g., custom, donor, etc.)
             let insertAfter = span;
             let node = span.nextSibling;
             while (
                 node &&
-                (node.nodeType === 1 || node.nodeType === 3) && // element or text node
+                (node.nodeType === 1 || node.nodeType === 3) &&
                 (
                     (node.nodeType === 1 && (
                         node.tagName === 'IMG' ||
@@ -282,7 +301,6 @@
                 insertAfter = node;
                 node = node.nextSibling;
             }
-            // Order: @, reply, PM
             if (insertAfter.nextSibling) {
                 insertAfter.parentNode.insertBefore(atBtn, insertAfter.nextSibling);
                 insertAfter.parentNode.insertBefore(reply, atBtn.nextSibling);
@@ -295,7 +313,6 @@
         });
     }
 
-    // Wait for chat DOM to initialize and then setup all enhancements
     function init() {
         let tryCount = 0;
         const check = setInterval(() => {
@@ -306,7 +323,6 @@
                 if (ok) {
                     clearInterval(check);
                     addReplyButtonsEach();
-                    // Update buttons on new messages
                     const observer = new MutationObserver(() => addReplyButtonsEach());
                     observer.observe(chat, { childList: true });
                 }
@@ -315,7 +331,6 @@
         }, 800);
     }
 
-    // Style for BBCode panel and action buttons
     const style = document.createElement('style');
     style.innerHTML = `
     #bbCodesPanelContainer {
@@ -380,15 +395,30 @@
         padding: 0 !important; margin-left:5px !important; background:none !important;border:none !important; width:18px !important;height:16px !important;
     }
     `;
+
     document.head.appendChild(style);
 
-    // Additional style: hide the "is typing..." info in chat
     const hideTypingStyle = document.createElement('style');
     hideTypingStyle.innerHTML = `
-    .chatbox__typing, .chatbox-typing, .typing-indicator {
+    .chatbox__typing, .chatbox-typing, .typing-indicator,
+    .chatroom__user-typing, .chat__user-typing,
+    .user-typing, .typing, .is-typing-banner,
+    .chatbox__footer__is-typing,
+    [data-typing],
+    span[x-show*="activePeer"] {
         display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        max-width: 0 !important;
+        max-height: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
     `;
+
     document.head.appendChild(hideTypingStyle);
 
     init();
