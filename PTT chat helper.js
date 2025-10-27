@@ -2,7 +2,7 @@
 // @name         UNIT3D chatbox - polishtorrent.top edition
 // @author       mehech
 // @version      1.0
-// @description  BBCode panel chat helper for PTT
+// @description  PTT chat helper
 // @match        https://polishtorrent.top/*
 // @grant        none
 // @license      MIT
@@ -26,9 +26,16 @@
         return `#${rgbArray.map(v => Number(v).toString(16).padStart(2, '0')).join('')}`;
     }
 
+    // Extract currently logged-in username from the page's top bar
     function extractUser() {
         const userLink = document.querySelector('a.top-nav__username--highresolution');
         if (userLink) {
+            const span = userLink.querySelector('span');
+            if (span) {
+                // Remove icons (if any) and trim nick to pure text
+                return span.textContent.replace(/^\s*|\s*$/g, '').replace(/\s+/, '').trim();
+            }
+            // Fallback to URL fragment
             const url = new URL(userLink.href);
             return url.pathname.split('/').pop();
         }
@@ -174,13 +181,9 @@
         navigator.clipboard.readText().then(clipText => {
             const ytLink = clipText.trim();
             let videoId = '';
-
-            // Extract video ID from youtu.be link
             if (ytLink.match(/^https:\/\/youtu\.be\//)) {
                 videoId = ytLink.split('/').pop();
-            }
-            // Extract video ID from youtube.com watch?v= link
-            else if (ytLink.match(/youtube\.com\/watch\?v=/)) {
+            } else if (ytLink.match(/youtube\.com\/watch\?v=/)) {
                 try {
                     const urlParams = new URLSearchParams((new URL(ytLink)).search);
                     videoId = urlParams.get('v') || '';
@@ -188,7 +191,6 @@
                     videoId = '';
                 }
             }
-
             if (videoId) {
                 chatbox.value += `[youtube]${videoId}[/youtube] `;
             } else {
@@ -202,13 +204,14 @@
     }
 
     function addReplyButtonsEach() {
+        const userSelf = extractUser();
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
         document.querySelectorAll('address.chatbox-message__address.user-tag').forEach(address => {
             if (!address) return;
             const link = address.querySelector('.user-tag__link');
             const span = link && link.querySelector('span');
             if (!link || !span) return;
-            const username = span.textContent.trim();
+            let username = span.textContent.replace(/^\s*|\s*$/g, '').replace(/\s+/, '').trim();
             const isBot = BOTNICKS.some(bot => bot.toLowerCase() === username.toLowerCase());
             if (!username || isBot) return;
             if (span.nextSibling && span.nextSibling.className && span.nextSibling.className.includes('enh-chat-btn-action')) return;
@@ -283,6 +286,29 @@
                 window.open(url, '_blank');
             };
 
+            // Edit message button with pencil icon – only if this is the current user's message
+            let editBtn = null;
+            if (username === userSelf) {
+                editBtn = document.createElement('button');
+                editBtn.className = 'enh-chat-btn-action';
+                editBtn.title = 'Edit message';
+                editBtn.style.marginLeft = '2px';
+                editBtn.innerHTML = '&#9998;';
+                editBtn.onclick = function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    let rootMsg = address.closest('.chatbox-message');
+                    if (!rootMsg) return;
+                    let contentSection = rootMsg.querySelector('.chatbox-message__content, section.bbcode-rendered');
+                    let content = contentSection ? contentSection.innerText.trim() : '';
+                    const chatbox = document.querySelector('#chatbox__messages-create');
+                    if (!chatbox) return;
+                    chatbox.value = content;
+                    chatbox.focus();
+                    chatbox.setSelectionRange(chatbox.value.length, chatbox.value.length);
+                };
+            }
+
             let insertAfter = span;
             let node = span.nextSibling;
             while (
@@ -301,14 +327,17 @@
                 insertAfter = node;
                 node = node.nextSibling;
             }
+            // Insert buttons in order; edit only if this is user's own message
             if (insertAfter.nextSibling) {
                 insertAfter.parentNode.insertBefore(atBtn, insertAfter.nextSibling);
                 insertAfter.parentNode.insertBefore(reply, atBtn.nextSibling);
                 insertAfter.parentNode.insertBefore(msg, reply.nextSibling);
+                if (editBtn) insertAfter.parentNode.insertBefore(editBtn, msg.nextSibling);
             } else {
                 insertAfter.parentNode.appendChild(atBtn);
                 insertAfter.parentNode.appendChild(reply);
                 insertAfter.parentNode.appendChild(msg);
+                if (editBtn) insertAfter.parentNode.appendChild(editBtn);
             }
         });
     }
@@ -418,7 +447,6 @@
         pointer-events: none !important;
     }
     `;
-
     document.head.appendChild(hideTypingStyle);
 
     init();
