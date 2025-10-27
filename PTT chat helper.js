@@ -239,7 +239,7 @@
                         userColor = rgbToHex(style.color);
                     }
                 }
-                const mentionText = `[color=${userColor}]@${username}[/color] `;
+                const mentionText = `[url=https://polishtorrent.top/users/${username}][color=${userColor}]@${username}[/color][/url] `;
                 chatbox.value += mentionText;
                 chatbox.focus();
             };
