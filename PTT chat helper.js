@@ -203,6 +203,23 @@
             chatbox.focus();
         });
     }
+    const user_tag_bb_code_factory = (username, additional_tags = {}, add_at_prefix = false) => {
+        console.log("prefix");
+        const prefix = add_at_prefix ? "@" : "";
+        console.log("data");
+        let data = `${prefix}${username}`;
+        console.log("for loop entry");
+        for (let key in additional_tags) {
+            console.log("for: key=", key);
+            const value = additional_tags[key];
+            console.log("for: value=", value);
+            const value_to_add = value === null ? "" : `=${value}`;
+            console.log("for: value_to_add=", value_to_add);
+            data = `[${key}${value_to_add}]${data}[/${key}]`;
+        }
+        console.log("for loop exit");
+        return `[url=https://polishtorrent.top/users/${username}]${data}[/url]`;
+    }
     const addReplyButtonsEach = () => {
         const userSelf = extractUser();
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
@@ -225,6 +242,7 @@
             atBtn.title = 'Mention user';
             atBtn.style.marginLeft = '5px';
             atBtn.onclick = (event) => {
+                console.log("enter on click AT");
                 event.preventDefault();
                 event.stopPropagation();
                 const chatbox = document.querySelector('#chatbox__messages-create');
@@ -239,7 +257,9 @@
                         userColor = rgbToHex(style.color);
                     }
                 }
-                const mentionText = `[url=https://polishtorrent.top/users/${username}][color=${userColor}]@${username}[/color][/url] `;
+                console.log("Right before message creation");
+                const mentionText = `${user_tag_bb_code_factory(username, {color: userColor}, true)} `;
+                console.log("Right after message creation");
                 chatbox.value += mentionText;
                 chatbox.focus();
             };
@@ -263,7 +283,7 @@
                         userColor = rgbToHex(style.color);
                     }
                 }
-                const quoteText = `[color=${userColor}][b]${username}[/b][/color]: [color=#ffff80][i]"${content}"[/i][/color]\n\n`;
+                const quoteText = `${user_tag_bb_code_factory(username, {color: userColor, b: null})}: [color=#ffff80][i]"${content}"[/i][/color]\n\n`;
                 chatbox.value += quoteText;
                 chatbox.focus();
             };
