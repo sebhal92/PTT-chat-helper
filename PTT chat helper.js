@@ -203,6 +203,21 @@
             chatbox.focus();
         });
     }
+    const user_tag_bb_code_factory = (username, additional_tags = {}, add_at_prefix = false) => {
+        const prefix = add_at_prefix ? "@" : "";
+        let data = `${prefix}${username}`;
+        /*
+        This mechanism has been added because in bbcode
+        style markers outside of url tag are not working
+        correclty.
+        */
+        for (let key in additional_tags) {
+            const value = additional_tags[key];
+            const value_to_add = value === null ? "" : `=${value}`;
+            data = `[${key}${value_to_add}]${data}[/${key}]`;
+        }
+        return `[url=https://polishtorrent.top/users/${username}]${data}[/url]`;
+    }
     const addReplyButtonsEach = () => {
         const userSelf = extractUser();
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
@@ -239,7 +254,7 @@
                         userColor = rgbToHex(style.color);
                     }
                 }
-                const mentionText = `[url=https://polishtorrent.top/users/${username}][color=${userColor}]@${username}[/color][/url] `;
+                const mentionText = `${user_tag_bb_code_factory(username, {color: userColor}, true)} `;
                 chatbox.value += mentionText;
                 chatbox.focus();
             };
@@ -263,7 +278,7 @@
                         userColor = rgbToHex(style.color);
                     }
                 }
-                const quoteText = `[color=${userColor}][b]${username}[/b][/color]: [color=#ffff80][i]"${content}"[/i][/color]\n\n`;
+                const quoteText = `${user_tag_bb_code_factory(username, {color: userColor, b: null})}: [color=#ffff80][i]"${content}"[/i][/color]\n\n`;
                 chatbox.value += quoteText;
                 chatbox.focus();
             };
