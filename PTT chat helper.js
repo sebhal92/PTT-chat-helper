@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UNIT3D chatbox - polishtorrent.top edition
 // @author       mehech
-// @version      1.0
+// @version      1.2
 // @description  PTT chat helper
 // @match        https://polishtorrent.top/*
 // @grant        none
@@ -9,7 +9,7 @@
 // @namespace    PTTchathelper
 // ==/UserScript==
 
-(() => {
+(function () {
     'use strict';
 
     const BOTNICKS = ['SYSTEM', 'NERDBOT'];
@@ -19,13 +19,13 @@
         'Demonic': '#ffac6b'
     };
 
-    const rgbToHex = (rgb) => {
+    function rgbToHex(rgb) {
         const rgbArray = rgb.match(/\d+/g);
         if (!rgbArray || rgbArray.length !== 3) return rgb;
         return `#${rgbArray.map(v => Number(v).toString(16).padStart(2, '0')).join('')}`;
     }
 
-    const extractUser = () => {
+    function extractUser() {
         const userLink = document.querySelector('a.top-nav__username--highresolution');
         if (userLink) {
             const span = userLink.querySelector('span');
@@ -38,10 +38,11 @@
         return null;
     }
 
-    const setupBBCodePanel = (chatbox) => {
+    function setupBBCodePanel(chatbox) {
         if (!chatbox) return false;
         if (document.getElementById('bbCodesPanelContainer')) return true;
 
+        // Create BBCode panel
         const container = document.createElement('div');
         container.id = 'bbCodesPanelContainer';
         container.innerHTML = `
@@ -67,12 +68,11 @@
                 </div>
             </div>
         `;
-        let parent = chatbox.closest('form, .chatbox__footer, .chatbox__form, .chatbox__actions, .chatbox');
-        if (parent && parent !== chatbox && parent.parentElement) {
-            parent.parentElement.insertBefore(container, parent);
-        } else {
-            chatbox.before(container);
-        }
+
+        // Insert panel BBCode directly after the textarea - avoids placeholder overlap
+        chatbox.parentNode.insertBefore(container, chatbox.nextSibling);
+
+        // BBCode panel button event listeners
         container.querySelectorAll('.bbc-btn[data-bbcode]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const bbCode = btn.getAttribute('data-bbcode');
@@ -82,7 +82,6 @@
                 else insertBBCode(chatbox, bbCode);
             });
         });
-        // Improved: colorPicker will wrap BBCode around selection or insert at cursor
         container.querySelector('#colorButton').addEventListener('click', () => {
             document.getElementById('colorPicker').style.display = 'inline-block';
         });
@@ -93,7 +92,6 @@
             const selStart = chatbox.selectionStart;
             const selEnd = chatbox.selectionEnd;
             if (selStart !== undefined && selEnd !== undefined && selStart !== selEnd) {
-                // Wrap selection
                 const before = chatbox.value.substring(0, selStart);
                 const selected = chatbox.value.substring(selStart, selEnd);
                 const after = chatbox.value.substring(selEnd);
@@ -101,7 +99,6 @@
                 chatbox.value = before + colorBBCode + after;
                 chatbox.setSelectionRange(before.length + colorBBCode.length, before.length + colorBBCode.length);
             } else {
-                // Insert at cursor, position cursor in the middle
                 const pos = chatbox.selectionStart || chatbox.value.length;
                 const colorBBCode = `[color=${color}][/color]`;
                 chatbox.value = chatbox.value.slice(0, pos) + colorBBCode + chatbox.value.slice(pos);
@@ -132,13 +129,13 @@
         });
         return true;
     }
-    const insertEmoji = (emoji, chatbox) => {
+    function insertEmoji(emoji, chatbox) {
         const pos = chatbox.selectionStart || chatbox.value.length;
         chatbox.value = chatbox.value.substring(0, pos) + emoji + chatbox.value.substring(pos);
         chatbox.setSelectionRange(pos + emoji.length, pos + emoji.length);
         chatbox.focus();
     }
-    const insertBBCode = (chatbox, bbCode) => {
+    function insertBBCode(chatbox, bbCode) {
         const textSelected = chatbox.value.substring(chatbox.selectionStart, chatbox.selectionEnd);
         const startTag = bbCode.substring(0, bbCode.indexOf(']') + 1);
         const endTag = bbCode.substring(bbCode.lastIndexOf('['));
@@ -154,7 +151,7 @@
         }
         chatbox.focus();
     }
-    const insertBBCodeWithClipboard = (tag, chatbox) => {
+    function insertBBCodeWithClipboard(tag, chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const newContent = clipText.trim().length > 0
                 ? tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1${clipText}$3`)
@@ -166,7 +163,7 @@
             chatbox.focus();
         });
     }
-    const insertImgBBCodeWithClipboard = (tag, chatbox) => {
+    function insertImgBBCodeWithClipboard(tag, chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const newContent = clipText.trim().length > 0
                 ? tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1${clipText}$3`)
@@ -178,7 +175,7 @@
             chatbox.focus();
         });
     }
-    const insertVideoBBCodeWithClipboard = (chatbox) => {
+    function insertVideoBBCodeWithClipboard(chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const ytLink = clipText.trim();
             let videoId = '';
@@ -203,7 +200,7 @@
             chatbox.focus();
         });
     }
-    const addReplyButtonsEach = () => {
+    function addReplyButtonsEach() {
         const userSelf = extractUser();
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
         document.querySelectorAll('address.chatbox-message__address.user-tag').forEach(address => {
@@ -224,7 +221,7 @@
             atBtn.textContent = '@';
             atBtn.title = 'Mention user';
             atBtn.style.marginLeft = '5px';
-            atBtn.onclick = (event) => {
+            atBtn.onclick = function(event) {
                 event.preventDefault();
                 event.stopPropagation();
                 const chatbox = document.querySelector('#chatbox__messages-create');
@@ -248,7 +245,7 @@
             reply.textContent = '↩️';
             reply.title = 'Reply';
             reply.style.marginLeft = '2px';
-            reply.onclick = (event) => {
+            reply.onclick = function(event) {
                 event.preventDefault();
                 event.stopPropagation();
                 const chatbox = document.querySelector('#chatbox__messages-create');
@@ -272,7 +269,7 @@
             msg.textContent = '✉️';
             msg.title = 'Private message';
             msg.style.marginLeft = '2px';
-            msg.onclick = (event) => {
+            msg.onclick = function(event) {
                 event.preventDefault();
                 event.stopPropagation();
                 const myUsername = extractUser();
@@ -280,15 +277,14 @@
                 const url = `/users/${myUsername}/conversations/create?username=${encodeURIComponent(username)}`;
                 window.open(url, '_blank');
             };
-            // Edit message only if this is self
             let editBtn = null;
             if (username === userSelf) {
                 editBtn = document.createElement('button');
                 editBtn.className = 'enh-chat-btn-action';
                 editBtn.title = 'Edit message';
                 editBtn.style.marginLeft = '2px';
-                editBtn.innerHTML = '&#9998;';
-                editBtn.onclick = (event) => {
+                editBtn.innerHTML = '✎';
+                editBtn.onclick = function(event) {
                     event.preventDefault();
                     event.stopPropagation();
                     let rootMsg = address.closest('.chatbox-message');
@@ -333,7 +329,7 @@
             }
         });
     }
-    const init = () => {
+    function init() {
         let tryCount = 0;
         const check = setInterval(() => {
             const chatbox = document.querySelector('#chatbox__messages-create');
@@ -350,71 +346,56 @@
             if (++tryCount > 50) clearInterval(check);
         }, 800);
     }
+
     const style = document.createElement('style');
     style.innerHTML = `
     #bbCodesPanelContainer {
-        display: block !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        box-sizing: border-box !important;
-        margin: 0 0 6px 0 !important;
-        position: relative !important;
-        left: 0 !important;
-        float: none !important;
-        clear: none !important;
+        width: 100%;
+        margin-top: 6px;
+        background: none;
+        border: none;
     }
     #bbCodesPanel {
-        display: flex !important;
-        flex-direction: row !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-        justify-content: flex-start !important;
-        align-items: center !important;
-        background: transparent !important;
-        color: white !important;
-        padding: 2px 7px 2px 7px !important;
-        border-radius: 7px !important;
-        border: none !important;
-        gap: 6px !important;
-        margin: 0 !important;
-        box-shadow: none !important;
-        align-self: flex-start !important;
-        left: 0 !important;
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        justify-content: flex-start;
+        gap: 6px;
+        background: transparent;
+        color: white;
+        border-radius: 7px;
+        border: none;
     }
     #bbCodesPanel .bbc-btn, .enh-chat-btn-action {
-        font-size: 13.5px !important;
-        font-family: inherit !important;
-        background: #383868 !important;
-        color: #ffe266 !important;
-        border-radius: 4.2px !important;
-        margin-left: 5px !important;
-        margin-right: 0 !important;
-        padding: 2.5px 9px 2.5px 9px !important;
-        vertical-align:middle !important;
-        cursor: pointer !important;
-        border:none !important;
-        box-shadow:none !important;
-        font-weight: 600 !important;
+        font-size: 13.5px;
+        font-family: inherit;
+        background: #383868;
+        color: #ffe266;
+        border-radius: 4.2px;
+        margin-left: 5px;
+        margin-right: 0;
+        padding: 2.5px 9px 2.5px 9px;
+        cursor: pointer;
+        border:none;
+        font-weight: 600;
         transition: background 0.13s;
-        outline: none !important;
-        line-height: 1.2 !important;
-        display:inline-block !important;
-        min-width:24px !important;
-        min-height:24px !important;
+        outline: none;
+        line-height: 1.2;
+        display:inline-block;
+        min-width:24px;
+        min-height:24px;
     }
     #bbCodesPanel .bbc-btn:hover, #bbCodesPanel .bbc-btn:focus,
     .enh-chat-btn-action:hover, .enh-chat-btn-action:focus {
-        background: #b068e7 !important;
-        color: #fff !important;
+        background: #b068e7;
+        color: #fff;
     }
     #bbCodesPanel input[type=color] {
-        padding: 0 !important; margin-left:5px !important; background:none !important;border:none !important; width:18px !important;height:16px !important;
+        padding: 0; margin-left:5px; background:none;border:none; width:18px;height:16px;
     }
     `;
     document.head.appendChild(style);
+
     const hideTypingStyle = document.createElement('style');
     hideTypingStyle.innerHTML = `
     .chatbox__typing, .chatbox-typing, .typing-indicator,
