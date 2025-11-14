@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UNIT3D chatbox - polishtorrent.top edition
-// @author       mehech
-// @version      1.2
+// @author       mehech (mod by perplexity)
+// @version      1.3
 // @description  PTT chat helper
 // @match        https://polishtorrent.top/*
 // @grant        none
@@ -19,12 +19,14 @@
         'Demonic': '#ffac6b'
     };
 
+    // Convert rgb color to hex
     function rgbToHex(rgb) {
         const rgbArray = rgb.match(/\d+/g);
         if (!rgbArray || rgbArray.length !== 3) return rgb;
         return `#${rgbArray.map(v => Number(v).toString(16).padStart(2, '0')).join('')}`;
     }
 
+    // Extract logged-in username from navigation bar
     function extractUser() {
         const userLink = document.querySelector('a.top-nav__username--highresolution');
         if (userLink) {
@@ -38,6 +40,7 @@
         return null;
     }
 
+    // Generate BBCode panel next to chatbox
     function setupBBCodePanel(chatbox) {
         if (!chatbox) return false;
         if (document.getElementById('bbCodesPanelContainer')) return true;
@@ -69,10 +72,10 @@
             </div>
         `;
 
-        // Insert panel BBCode directly after the textarea - avoids placeholder overlap
+        // Insert BBCode panel directly after the textarea
         chatbox.parentNode.insertBefore(container, chatbox.nextSibling);
 
-        // BBCode panel button event listeners
+        // Add event listeners to BBCode buttons
         container.querySelectorAll('.bbc-btn[data-bbcode]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const bbCode = btn.getAttribute('data-bbcode');
@@ -129,12 +132,14 @@
         });
         return true;
     }
+    // Insert selected emoji
     function insertEmoji(emoji, chatbox) {
         const pos = chatbox.selectionStart || chatbox.value.length;
         chatbox.value = chatbox.value.substring(0, pos) + emoji + chatbox.value.substring(pos);
         chatbox.setSelectionRange(pos + emoji.length, pos + emoji.length);
         chatbox.focus();
     }
+    // Insert BBCode around selection or at caret
     function insertBBCode(chatbox, bbCode) {
         const textSelected = chatbox.value.substring(chatbox.selectionStart, chatbox.selectionEnd);
         const startTag = bbCode.substring(0, bbCode.indexOf(']') + 1);
@@ -151,6 +156,7 @@
         }
         chatbox.focus();
     }
+    // Insert BBCode with clipboard text
     function insertBBCodeWithClipboard(tag, chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const newContent = clipText.trim().length > 0
@@ -163,6 +169,7 @@
             chatbox.focus();
         });
     }
+    // Insert image BBCode with clipboard text
     function insertImgBBCodeWithClipboard(tag, chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const newContent = clipText.trim().length > 0
@@ -175,6 +182,7 @@
             chatbox.focus();
         });
     }
+    // Insert YouTube BBCode with clipboard link
     function insertVideoBBCodeWithClipboard(chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const ytLink = clipText.trim();
@@ -200,6 +208,7 @@
             chatbox.focus();
         });
     }
+    // Add action buttons to each chat message
     function addReplyButtonsEach() {
         const userSelf = extractUser();
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
@@ -216,6 +225,7 @@
             if (!rootMsg) rootMsg = address.parentNode;
             const contentSection = rootMsg.querySelector('.chatbox-message__content, section.bbcode-rendered');
             const content = contentSection ? contentSection.innerText.trim() : '';
+            // -- mention button with profile link --
             const atBtn = document.createElement('button');
             atBtn.className = 'enh-chat-btn-action';
             atBtn.textContent = '@';
@@ -236,10 +246,12 @@
                         userColor = rgbToHex(style.color);
                     }
                 }
-                const mentionText = `[color=${userColor}]@${username}[/color] `;
+                // Add clickable profile link around mention
+                const mentionText = `[url=https://polishtorrent.top/users/${username}][color=${userColor}]@${username}[/color][/url] `;
                 chatbox.value += mentionText;
                 chatbox.focus();
             };
+            // -- reply button with profile link in quote --
             const reply = document.createElement('button');
             reply.className = 'enh-chat-btn-action';
             reply.textContent = '↩️';
@@ -260,10 +272,12 @@
                         userColor = rgbToHex(style.color);
                     }
                 }
-                const quoteText = `[color=${userColor}][b]${username}[/b][/color]: [color=#ffff80][i]"${content}"[/i][/color]\n\n`;
+                // Add clickable profile link to quoted username
+                const quoteText = `[url=https://polishtorrent.top/users/${username}][color=${userColor}][b]${username}[/b][/color][/url]: [color=#ffff80][i]"${content}"[/i][/color]\n\n`;
                 chatbox.value += quoteText;
                 chatbox.focus();
             };
+            // -- private message button --
             const msg = document.createElement('button');
             msg.className = 'enh-chat-btn-action';
             msg.textContent = '✉️';
@@ -277,6 +291,7 @@
                 const url = `/users/${myUsername}/conversations/create?username=${encodeURIComponent(username)}`;
                 window.open(url, '_blank');
             };
+            // -- edit own message button --
             let editBtn = null;
             if (username === userSelf) {
                 editBtn = document.createElement('button');
@@ -298,6 +313,7 @@
                     chatbox.setSelectionRange(chatbox.value.length, chatbox.value.length);
                 };
             }
+            // Insert buttons after username
             let insertAfter = span;
             let node = span.nextSibling;
             while (
@@ -329,6 +345,7 @@
             }
         });
     }
+    // Start script: wait until chatbox and messages appear
     function init() {
         let tryCount = 0;
         const check = setInterval(() => {
@@ -347,6 +364,7 @@
         }, 800);
     }
 
+    // Custom chat styles
     const style = document.createElement('style');
     style.innerHTML = `
     #bbCodesPanelContainer {
@@ -396,6 +414,7 @@
     `;
     document.head.appendChild(style);
 
+    // Hide all typing banners for clearer chat
     const hideTypingStyle = document.createElement('style');
     hideTypingStyle.innerHTML = `
     .chatbox__typing, .chatbox-typing, .typing-indicator,
@@ -417,5 +436,6 @@
     }
     `;
     document.head.appendChild(hideTypingStyle);
+
     init();
 })();
