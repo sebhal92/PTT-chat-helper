@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UNIT3D chatbox - polishtorrent.top edition
 // @author       mehech
-// @version      1.4
+// @version      1.5
 // @description  PTT chat helper
 // @match        https://polishtorrent.top/*
 // @grant        none
@@ -12,7 +12,7 @@
 (function () {
     'use strict';
 
-    // Custom color map for bots/users
+    // Custom color / bot logic
     const BOTNICKS = ['SYSTEM', 'NERDBOT'];
     const USER_COLORS = {
         'ace': '#ef008c',
@@ -20,28 +20,50 @@
         'Demonic': '#ffac6b'
     };
 
-    // Helper for rgb/rgba color to hex
+    // Convert rgb string (not used here)
     function rgbToHex(rgb) {
         const rgbArray = rgb.match(/\d+/g);
         if (!rgbArray || rgbArray.length < 3) return rgb;
         return `#${rgbArray.slice(0, 3).map(v => Number(v).toString(16).padStart(2, '0')).join('')}`;
     }
 
-    // Get logged user login for action buttons
+    // Get user login
     function extractUser() {
         const userLink = document.querySelector('a.top-nav__username--highresolution');
         if (userLink) {
             const span = userLink.querySelector('span');
-            if (span) {
-                return span.textContent.replace(/^\s*|\s*$/g, '').replace(/\s+/, '').trim();
-            }
+            if (span) return span.textContent.replace(/^\s*|\s*$/g, '').replace(/\s+/, '').trim();
             const url = new URL(userLink.href);
             return url.pathname.split('/').pop();
         }
         return null;
     }
 
-    // Setup BBCode panel below chatbox
+    // Convert basic HTML from chat to BBCode (color, b, i, u, url, img, newlines)
+    function htmlToBBCode(html) {
+        return html
+            .replace(/<b[^>]*>(.*?)<\/b>/gi, '[b]$1[/b]')
+            .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '[b]$1[/b]')
+            .replace(/<i[^>]*>(.*?)<\/i>/gi, '[i]$1[/i]')
+            .replace(/<em[^>]*>(.*?)<\/em>/gi, '[i]$1[/i]')
+            .replace(/<u[^>]*>(.*?)<\/u>/gi, '[u]$1[/u]')
+            .replace(/<span[^>]*style\s*=\s*["'][^"']*color:\s*(#[0-9a-f]{3,6}|[a-zA-Z]+)[^"']*["'][^>]*>(.*?)<\/span>/gi,
+                function (_, color, text) {
+                    return '[color=' + color + ']' + text + '[/color]';
+            })
+            .replace(/<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi, '[url=$1]$2[/url]')
+            .replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, '[img]$1[/img]')
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/?(span|div)[^>]*>/gi, '')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/&amp;/gi, '&')
+            .replace(/&lt;/gi, '<')
+            .replace(/&gt;/gi, '>')
+            .replace(/<\/?[^>]+(>|$)/g, '') // remove remaining html
+            .trim();
+    }
+
+    // BBCode panel + color picker
     function setupBBCodePanel(chatbox) {
         if (!chatbox) return false;
         if (document.getElementById('bbCodesPanelContainer')) return true;
@@ -72,7 +94,7 @@
         `;
         chatbox.parentNode.insertBefore(container, chatbox.nextSibling);
 
-        // All BBCode buttons logic
+        // BBCode buttons
         container.querySelectorAll('.bbc-btn[data-bbcode]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const bbCode = btn.getAttribute('data-bbcode');
@@ -83,7 +105,7 @@
             });
         });
 
-        // Color button triggers native color picker immediately
+        // Native color picker logic
         const colorBtn = container.querySelector('#colorButton');
         const picker = container.querySelector('#colorPicker');
         colorBtn.addEventListener('click', () => {
@@ -111,7 +133,7 @@
             chatbox.focus();
         });
 
-        // Video, emoji logic
+        // Video and emoji logic
         container.querySelector('#videoButton').addEventListener('click', () => insertVideoBBCodeWithClipboard(chatbox));
         container.querySelector('#emojiButton').addEventListener('click', () => {
             const menu = document.getElementById('emojiMenu');
@@ -133,14 +155,13 @@
         return true;
     }
 
-    // Insert emoji at caret in chatbox
+    // BBCode/clipboard helpers (unchanged)
     function insertEmoji(emoji, chatbox) {
         const pos = chatbox.selectionStart || chatbox.value.length;
         chatbox.value = chatbox.value.substring(0, pos) + emoji + chatbox.value.substring(pos);
         chatbox.setSelectionRange(pos + emoji.length, pos + emoji.length);
         chatbox.focus();
     }
-    // Insert BBCode tag around selection or caret
     function insertBBCode(chatbox, bbCode) {
         const textSelected = chatbox.value.substring(chatbox.selectionStart, chatbox.selectionEnd);
         const startTag = bbCode.substring(0, bbCode.indexOf(']') + 1);
@@ -157,7 +178,6 @@
         }
         chatbox.focus();
     }
-    // Clipboard insertion helpers
     function insertBBCodeWithClipboard(tag, chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const newContent = clipText.trim().length > 0
@@ -208,7 +228,7 @@
         });
     }
 
-    // Add all action buttons (mention, reply, PM, edit/gift) per chat message
+    // Add action buttons (mention/reply/pm/gift/edit)
     function addReplyButtonsEach() {
         const userSelf = extractUser();
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
@@ -224,7 +244,7 @@
             let rootMsg = address.closest('.chatbox-message');
             if (!rootMsg) rootMsg = address.parentNode;
             const contentSection = rootMsg.querySelector('.chatbox-message__content, section.bbcode-rendered');
-            const content = contentSection ? contentSection.innerText.trim() : '';
+            const contentHtml = contentSection ? contentSection.innerHTML.trim() : '';
             // Mention button
             const atBtn = document.createElement('button');
             atBtn.className = 'enh-chat-btn-action';
@@ -236,14 +256,12 @@
                 const chatbox = document.querySelector('#chatbox__messages-create');
                 if (!chatbox) return;
                 let userColor = '#ecc846';
-                if (USER_COLORS.hasOwnProperty(username)) {
-                    userColor = USER_COLORS[username];
-                }
+                if (USER_COLORS.hasOwnProperty(username)) userColor = USER_COLORS[username];
                 const mentionText = `[url=https://polishtorrent.top/users/${username}][color=${userColor}]@${username}[/color][/url] `;
                 chatbox.value += mentionText;
                 chatbox.focus();
             };
-            // Reply button
+            // Reply
             const reply = document.createElement('button');
             reply.className = 'enh-chat-btn-action';
             reply.textContent = '↩️';
@@ -255,14 +273,13 @@
                 const chatbox = document.querySelector('#chatbox__messages-create');
                 if (!chatbox) return;
                 let userColor = '#ecc846';
-                if (USER_COLORS.hasOwnProperty(username)) {
-                    userColor = USER_COLORS[username];
-                }
-                const quoteText = `[url=https://polishtorrent.top/users/${username}][color=${userColor}][b]${username}[/b][/color][/url]: [color=#ffff80][i]"${content}"[/i][/color]\n\n`;
+                if (USER_COLORS.hasOwnProperty(username)) userColor = USER_COLORS[username];
+                const contentText = contentSection ? contentSection.textContent.trim() : '';
+                const quoteText = `[url=https://polishtorrent.top/users/${username}][color=${userColor}][b]${username}[/b][/color][/url]: [color=#ffff80][i]"${contentText}"[/i][/color]\n\n`;
                 chatbox.value += quoteText;
                 chatbox.focus();
             };
-            // Private message button
+            // PM
             const msg = document.createElement('button');
             msg.className = 'enh-chat-btn-action';
             msg.textContent = '✉️';
@@ -276,7 +293,7 @@
                 const url = `/users/${myUsername}/conversations/create?username=${encodeURIComponent(username)}`;
                 window.open(url, '_blank');
             };
-            // Gift/edit depends on author
+            // Edit button – HTML→BBCode conversion
             let additionalBtn;
             if (username === userSelf) {
                 additionalBtn = document.createElement('button');
@@ -289,11 +306,12 @@
                     event.stopPropagation();
                     let rootMsg = address.closest('.chatbox-message');
                     if (!rootMsg) return;
-                    let contentSection = rootMsg.querySelector('.chatbox-message__content, section.bbcode-rendered');
-                    let content = contentSection ? contentSection.innerText.trim() : '';
+                    const contentSection = rootMsg.querySelector('.chatbox-message__content, section.bbcode-rendered');
+                    const htmlMsg = contentSection ? contentSection.innerHTML.trim() : '';
+                    const bbcode = htmlToBBCode(htmlMsg);
                     const chatbox = document.querySelector('#chatbox__messages-create');
                     if (!chatbox) return;
-                    chatbox.value = content;
+                    chatbox.value = bbcode;
                     chatbox.focus();
                     chatbox.setSelectionRange(chatbox.value.length, chatbox.value.length);
                 };
@@ -344,7 +362,7 @@
         });
     }
 
-    // Gift UI, chat-colored, with bon field
+    // Gift panel (all visuals as previously)
     function addGiftDialog(token, user, username) {
         const existing = document.getElementById('gift-panel');
         if (existing) existing.remove();
@@ -370,9 +388,7 @@
         document.body.appendChild(panel);
         const st = document.createElement('style');
         st.textContent = `
-#gift-panel { position: fixed; top:50%; left:50%; transform:translate(-50%,-51%);
-    background:#232229; color:#ffe266; border-radius:13px; min-width:340px; max-width:97vw;
-    padding:26px 30px 20px 30px; z-index:9999; border:1.5px solid #3d3c44; font-family:inherit; box-shadow:0 2px 22px #000a;}
+#gift-panel { position: fixed; top:50%; left:50%; transform:translate(-50%,-51%); background:#232229; color:#ffe266; border-radius:13px; min-width:340px; max-width:97vw; padding:26px 30px 20px 30px; z-index:9999; border:1.5px solid #3d3c44; font-family:inherit; box-shadow:0 2px 22px #000a;}
 #gift-panel .gift-panel-header { font-size:1.17em; font-weight:700; color:#ffe266; margin-bottom:19px; border-bottom:1px solid #544ea5; padding-bottom:11px; letter-spacing:.7px;}
 #gift-panel label { display:block; margin-bottom:12px; color:#fffad0; font-size:1em; font-weight:500;}
 #gift-panel input[type="number"], #gift-panel textarea { width:100%; background:#292939; color:#ffe266; border:1.5px solid #b068e7; border-radius:6px; padding:10px 14px; font-size:1em; margin-top:3px; margin-bottom:14px; box-sizing:border-box; font-family:inherit; outline:none;}
@@ -408,7 +424,7 @@
         }, 800);
     }
 
-    // Add styles for panel/buttons
+    // Append styling for full panel/button look
     const styleFix = document.createElement('style');
     styleFix.innerHTML = `
 #bbCodesPanelContainer { width:100%; margin-top:6px; background:none; border:none; }
@@ -418,7 +434,7 @@
 `;
     document.head.appendChild(styleFix);
 
-    // Hide typing indicators for lean UI
+    // Hide typing indicator
     const hideTypingStyle = document.createElement('style');
     hideTypingStyle.innerHTML = `
 .chatbox__typing, .chatbox-typing, .typing-indicator, .chatroom__user-typing, .chat__user-typing, .user-typing, .typing, .is-typing-banner, .chatbox__footer__is-typing, [data-typing], span[x-show*="activePeer"] { display:none!important; visibility:hidden!important; width:0!important; height:0!important; min-width:0!important; min-height:0!important; max-width:0!important; max-height:0!important; opacity:0!important; pointer-events:none!important; }
