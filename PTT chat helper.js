@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         UNIT3D chatbox - polishtorrent.top edition
 // @author       mehech
-// @version      1.7
+// @version      1.9
 // @description  PTT chat helper
 // @match        https://polishtorrent.top/*
 // @grant        none
 // @license      MIT
 // @namespace    PTTchathelper
+// @downloadURL https://update.greasyfork.org/scripts/554114/UNIT3D%20chatbox%20-%20polishtorrenttop%20edition.user.js
+// @updateURL https://update.greasyfork.org/scripts/554114/UNIT3D%20chatbox%20-%20polishtorrenttop%20edition.meta.js
 // ==/UserScript==
 
 (function () {
@@ -291,6 +293,12 @@
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
         document.querySelectorAll('address.chatbox-message__address.user-tag').forEach(address => {
             if (!address) return;
+
+            // Check if buttons already exist in this address block
+            if (address.querySelector('.enh-chat-btn-action')) {
+                return;
+            }
+
             const link = address.querySelector('.user-tag__link');
             const span = link && link.querySelector('span');
             if (!link || !span) return;
@@ -299,17 +307,13 @@
             const isBot = BOTNICKS.some(bot => bot.toLowerCase() === username.toLowerCase());
             if (!username || isBot) return;
 
-            if (span.nextSibling && span.nextSibling.className && span.nextSibling.className.includes('enh-chat-btn-action')) {
-                return;
-            }
-
             let rootMsg = address.closest('.chatbox-message');
             if (!rootMsg) rootMsg = address.parentNode;
 
             const contentSection = rootMsg.querySelector('.chatbox-message__content, section.bbcode-rendered');
             const contentText = contentSection ? contentSection.textContent.trim() : '';
 
-            // --- DYNAMIC USER COLOR DETECTION (always hex for BBCode)
+            // Dynamic user color detection (always hex for BBCode)
             let rawColor = '#ecc846';
             if (span && span.style && span.style.color && span.style.color !== '') {
                 rawColor = span.style.color;
@@ -326,7 +330,7 @@
             // Convert to proper hex for BBCode
             let userColor = cssColorToHex(rawColor);
 
-            // --- BUTTONS ---
+            // Create buttons
             const atBtn = document.createElement('button');
             atBtn.className = 'enh-chat-btn-action';
             atBtn.textContent = '@';
@@ -409,28 +413,11 @@
                 };
             }
 
-            let insertAfter = span;
-            let node = span.nextSibling;
-            while (node &&
-                (node.nodeType === 1 || node.nodeType === 3) &&
-                ((node.nodeType === 1 && (node.tagName === 'IMG' || node.tagName === 'SPAN' || node.tagName === 'I' || node.tagName === 'SVG')) ||
-                    (node.nodeType === 3 && node.textContent.trim() === ''))) {
-                insertAfter = node;
-                node = node.nextSibling;
-            }
-
-            if (insertAfter.nextSibling) {
-                insertAfter.parentNode.insertBefore(atBtn, insertAfter.nextSibling);
-                insertAfter.parentNode.insertBefore(reply, atBtn.nextSibling);
-                insertAfter.parentNode.insertBefore(msg, reply.nextSibling);
-                insertAfter.parentNode.insertBefore(additionalBtn, msg.nextSibling);
-            }
-            else {
-                insertAfter.parentNode.appendChild(atBtn);
-                insertAfter.parentNode.appendChild(reply);
-                insertAfter.parentNode.appendChild(msg);
-                insertAfter.parentNode.appendChild(additionalBtn);
-            }
+            // Append buttons at the end of the address element (after all content including icons)
+            address.appendChild(atBtn);
+            address.appendChild(reply);
+            address.appendChild(msg);
+            address.appendChild(additionalBtn);
         });
     }
 
