@@ -7,8 +7,6 @@
 // @grant        none
 // @license      MIT
 // @namespace    PTTchathelper
-// @downloadURL https://update.greasyfork.org/scripts/554114/UNIT3D%20chatbox%20-%20polishtorrenttop%20edition.user.js
-// @updateURL https://update.greasyfork.org/scripts/554114/UNIT3D%20chatbox%20-%20polishtorrenttop%20edition.meta.js
 // ==/UserScript==
 
 (function () {
@@ -655,3 +653,4 @@ span[x-show*="activePeer"] {
 
     init();
 })();
+
