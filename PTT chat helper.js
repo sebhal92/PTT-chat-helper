@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UNIT3D chatbox - polishtorrent.top edition
 // @author       mehech
-// @version      2.0
+// @version      2.1
 // @description  PTT chat helper
 // @match        https://polishtorrent.top/*
 // @grant        none
@@ -133,15 +133,18 @@
 
         previewArea.style.display = 'block';
 
-        // Convert BBCode to HTML for preview
+        // Convert BBCode to HTML for preview - improved regex
         let html = val
-            .replace(/\[url=([^\]]+)\]([^\[]+)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>')
-            .replace(/\[b\]([^\[]+)\[\/b\]/gi, '<b>$1</b>')
-            .replace(/\[i\]([^\[]+)\[\/i\]/gi, '<i>$1</i>')
-            .replace(/\[u\]([^\[]+)\[\/u\]/gi, '<u>$1</u>')
-            .replace(/\[color=([^\]]+)\]([^\[]+)\[\/color\]/gi, '<span style="color:$1">$2</span>')
-            .replace(/\[img\]([^\[]+)\[\/img\]/gi, '<img src="$1" style="max-width:100%; max-height:200px; border-radius:4px; margin:5px 0;" />')
-            .replace(/\[video\]([^\[]+)\[\/video\]/gi, function(_, videoId) {
+            // [url=link]text[/url]
+            .replace(/\[url=([^\]]+?)\]([\s\S]+?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>')
+            // [url]link[/url]
+            .replace(/\[url\]([^\[]+?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+            .replace(/\[b\]([\s\S]+?)\[\/b\]/gi, '<b>$1</b>')
+            .replace(/\[i\]([\s\S]+?)\[\/i\]/gi, '<i>$1</i>')
+            .replace(/\[u\]([\s\S]+?)\[\/u\]/gi, '<u>$1</u>')
+            .replace(/\[color=([^\]]+?)\]([\s\S]+?)\[\/color\]/gi, '<span style="color:$1">$2</span>')
+            .replace(/\[img\]([^\[]+?)\[\/img\]/gi, '<img src="$1" style="max-width:100%; max-height:200px; border-radius:4px; margin:5px 0;" />')
+            .replace(/\[video\]([^\[]+?)\[\/video\]/gi, function(_, videoId) {
                 if (videoId.match(/^[a-zA-Z0-9_\-]{11}$/)) {
                     return '<iframe width="280" height="157" src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allowfullscreen style="border-radius:4px; margin:5px 0;"></iframe>';
                 }
@@ -154,50 +157,53 @@
 
     function setupBBCodePanel(chatbox) {
         if (!chatbox) return false;
-        if (document.getElementById('bbCodesPanelContainer')) return true;
+        if (document.getElementById('bbCodePreviewArea')) return true;
 
-        const container = document.createElement('div');
-        container.id = 'bbCodesPanelContainer';
-        container.innerHTML = `
-            <div id="bbCodePreviewArea"></div>
-            <div id="bbCodesPanel">
-                <button type="button" class="bbc-btn" data-bbcode="[b][/b]" title="Bold">B</button>
-                <button type="button" class="bbc-btn" data-bbcode="[i][/i]" title="Italic">I</button>
-                <button type="button" class="bbc-btn" data-bbcode="[u][/u]" title="Underline">U</button>
-                <button type="button" class="bbc-btn" data-bbcode="[img][/img]" title="Image">IMG</button>
-                <button type="button" class="bbc-btn" data-bbcode="[url][/url]" title="URL">URL</button>
-                <button type="button" class="bbc-btn" id="videoButton" title="Video">VIDEO</button>
-                <button type="button" class="bbc-btn" id="colorButton" title="Color">Color</button>
-                <input type="color" id="colorPicker" style="display:none;" value="#ecc846">
-                <button type="button" class="bbc-btn" id="emojiButton" title="Emoji">😀</button>
-                <div id="emojiMenu" style="display:none;">
-                    <span class="emoji" data-emoji="😀">😀</span>
-                    <span class="emoji" data-emoji="😁">😁</span>
-                    <span class="emoji" data-emoji="😂">😂</span>
-                    <span class="emoji" data-emoji="🤣">🤣</span>
-                    <span class="emoji" data-emoji="😊">😊</span>
-                    <span class="emoji" data-emoji="😎">😎</span>
-                    <span class="emoji" data-emoji="😍">😍</span>
-                    <span class="emoji" data-emoji="😘">😘</span>
-                    <span class="emoji" data-emoji="🤔">🤔</span>
-                    <span class="emoji" data-emoji="😢">😢</span>
-                    <span class="emoji" data-emoji="😭">😭</span>
-                    <span class="emoji" data-emoji="😡">😡</span>
-                    <span class="emoji" data-emoji="👍">👍</span>
-                    <span class="emoji" data-emoji="👎">👎</span>
-                    <span class="emoji" data-emoji="👌">👌</span>
-                    <span class="emoji" data-emoji="✌️">✌️</span>
-                    <span class="emoji" data-emoji="🔥">🔥</span>
-                    <span class="emoji" data-emoji="⭐">⭐</span>
-                    <span class="emoji" data-emoji="❤️">❤️</span>
-                    <span class="emoji" data-emoji="💯">💯</span>
-                </div>
+        // Create preview area BEFORE chatbox
+        const previewDiv = document.createElement('div');
+        previewDiv.id = 'bbCodePreviewArea';
+        chatbox.parentNode.insertBefore(previewDiv, chatbox);
+
+        // Create button panel AFTER chatbox
+        const buttonContainer = document.createElement('div');
+        buttonContainer.id = 'bbCodesPanel';
+        buttonContainer.innerHTML = `
+            <button type="button" class="bbc-btn" data-bbcode="[b][/b]" title="Bold">B</button>
+            <button type="button" class="bbc-btn" data-bbcode="[i][/i]" title="Italic">I</button>
+            <button type="button" class="bbc-btn" data-bbcode="[u][/u]" title="Underline">U</button>
+            <button type="button" class="bbc-btn" data-bbcode="[img][/img]" title="Image">IMG</button>
+            <button type="button" class="bbc-btn" data-bbcode="[url][/url]" title="URL">URL</button>
+            <button type="button" class="bbc-btn" id="videoButton" title="Video">VIDEO</button>
+            <button type="button" class="bbc-btn" id="colorButton" title="Color">Color</button>
+            <input type="color" id="colorPicker" style="display:none;" value="#ecc846">
+            <button type="button" class="bbc-btn" id="emojiButton" title="Emoji">😀</button>
+            <div id="emojiMenu" style="display:none;">
+                <span class="emoji" data-emoji="😀">😀</span>
+                <span class="emoji" data-emoji="😁">😁</span>
+                <span class="emoji" data-emoji="😂">😂</span>
+                <span class="emoji" data-emoji="🤣">🤣</span>
+                <span class="emoji" data-emoji="😊">😊</span>
+                <span class="emoji" data-emoji="😎">😎</span>
+                <span class="emoji" data-emoji="😎">😎</span>
+                <span class="emoji" data-emoji="😍">😍</span>
+                <span class="emoji" data-emoji="😘">😘</span>
+                <span class="emoji" data-emoji="🤔">🤔</span>
+                <span class="emoji" data-emoji="😢">😢</span>
+                <span class="emoji" data-emoji="😭">😭</span>
+                <span class="emoji" data-emoji="😡">😡</span>
+                <span class="emoji" data-emoji="👍">👍</span>
+                <span class="emoji" data-emoji="👎">👎</span>
+                <span class="emoji" data-emoji="👌">👌</span>
+                <span class="emoji" data-emoji="✌️">✌️</span>
+                <span class="emoji" data-emoji="🔥">🔥</span>
+                <span class="emoji" data-emoji="⭐">⭐</span>
+                <span class="emoji" data-emoji="❤️">❤️</span>
+                <span class="emoji" data-emoji="💯">💯</span>
             </div>
         `;
+        chatbox.parentNode.insertBefore(buttonContainer, chatbox.nextSibling);
 
-        chatbox.parentNode.insertBefore(container, chatbox.nextSibling);
-
-        container.querySelectorAll('.bbc-btn[data-bbcode]').forEach(btn => {
+        buttonContainer.querySelectorAll('.bbc-btn[data-bbcode]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const bbCode = btn.getAttribute('data-bbcode');
                 if (!bbCode) return;
@@ -212,8 +218,8 @@
             });
         });
 
-        const colorBtn = container.querySelector('#colorButton');
-        const picker = container.querySelector('#colorPicker');
+        const colorBtn = buttonContainer.querySelector('#colorButton');
+        const picker = buttonContainer.querySelector('#colorPicker');
         colorBtn.addEventListener('click', () => picker.click());
         picker.addEventListener('input', function () {
             const color = this.value;
@@ -240,14 +246,14 @@
             updatePreview(chatbox);
         });
 
-        container.querySelector('#videoButton').addEventListener('click', () => insertVideoBBCodeWithClipboard(chatbox));
+        buttonContainer.querySelector('#videoButton').addEventListener('click', () => insertVideoBBCodeWithClipboard(chatbox));
 
-        container.querySelector('#emojiButton').addEventListener('click', () => {
+        buttonContainer.querySelector('#emojiButton').addEventListener('click', () => {
             const menu = document.getElementById('emojiMenu');
             menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
         });
 
-        container.querySelector('#emojiMenu').addEventListener('click', e => {
+        buttonContainer.querySelector('#emojiMenu').addEventListener('click', e => {
             if (e.target.classList.contains('emoji')) {
                 insertEmoji(e.target.getAttribute('data-emoji'), chatbox);
                 document.getElementById('emojiMenu').style.display = 'none';
@@ -676,12 +682,7 @@
             padding: 8px 12px !important;
         }
 
-        #bbCodesPanelContainer {
-            width: 100%;
-            margin-top: 6px;
-            background: none;
-            border: none;
-        }
+        /* Preview ABOVE textarea */
         #bbCodePreviewArea {
             display: none;
             background: rgba(35, 34, 41, 0.95);
@@ -699,11 +700,17 @@
         #bbCodePreviewArea a {
             color: #b068e7 !important;
             text-decoration: underline !important;
+            cursor: pointer;
+        }
+        #bbCodePreviewArea a:hover {
+            color: #d080ff !important;
         }
         #bbCodePreviewArea img {
             display: block;
             margin: 5px 0;
         }
+
+        /* Buttons BELOW textarea */
         #bbCodesPanel {
             display: flex;
             flex-direction: row;
@@ -715,6 +722,7 @@
             border-radius: 7px;
             border: none;
             position: relative;
+            margin-top: 6px;
         }
         #bbCodesPanel .bbc-btn,
         .enh-chat-btn-action {
