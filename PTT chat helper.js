@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UNIT3D chatbox - polishtorrent.top edition
 // @author       mehech
-// @version      2.1
+// @version      2.2
 // @description  PTT chat helper
 // @match        https://polishtorrent.top/*
 // @grant        none
@@ -12,31 +12,42 @@
 (function () {
     'use strict';
 
+    // Configuration: Bot nicknames to ignore
     const BOTNICKS = ['SYSTEM', 'NERDBOT'];
+
+    // Configuration: Custom user colors
     const USER_COLORS = {
         'ace': '#ef008c',
         'TheoneandonlyPook': '#ef008c',
         'Demonic': '#ffac6b'
     };
 
-    // Converts CSS rgb/rgba to hex (#rrggbb)
+    /**
+     * Converts CSS color (rgb, rgba, named) to hex format (#rrggbb)
+     * @param {string} color - CSS color value
+     * @returns {string} - Hex color code
+     */
     function cssColorToHex(color) {
         if (!color) return '#ecc846';
         color = color.trim();
 
+        // Already hex format
         if (color[0] === '#') {
             if (color.length === 4) {
+                // Expand shorthand #rgb to #rrggbb
                 return '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
             }
             return color.toLowerCase();
         }
 
+        // RGB/RGBA format
         let rgbMatch = color.match(/^rgb[a]?\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i);
         if (rgbMatch) {
             let r = parseInt(rgbMatch[1]), g = parseInt(rgbMatch[2]), b = parseInt(rgbMatch[3]);
             return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
         }
 
+        // Named colors lookup table
         const cssColors = {
             'black': '#000000', 'white': '#ffffff', 'red': '#ff0000', 'blue': '#0000ff', 'yellow': '#ffff00',
             'green': '#008000', 'orange': '#ffa500', 'purple': '#800080', 'pink': '#ffc0cb', 'gold': '#ffd700',
@@ -47,10 +58,13 @@
             return cssColors[color.toLowerCase()];
         }
 
-        return '#ecc846';
+        return '#ecc846'; // Default color
     }
 
-    // Extract current logged in username from the page
+    /**
+     * Extracts current logged-in username from the page
+     * @returns {string|null} - Username or null if not found
+     */
     function extractUser() {
         const userLink = document.querySelector('a.top-nav__username--highresolution');
         if (userLink) {
@@ -58,6 +72,7 @@
             if (span) {
                 return span.textContent.trim();
             }
+            // Fallback: extract from URL
             try {
                 const url = new URL(userLink.href);
                 return url.pathname.split('/').pop();
@@ -68,8 +83,14 @@
         return null;
     }
 
-    // Convert HTML to BBCode
+    /**
+     * Converts HTML markup to BBCode format
+     * Used for editing existing messages
+     * @param {string} html - HTML content
+     * @returns {string} - BBCode formatted text
+     */
     function htmlToBBCode(html) {
+        // Convert video embeds
         html = html.replace(/<iframe[^>]*src=["']([^"']+)["'][^>]*><\/iframe>/gi, function(_, url) {
             let videoId = "";
             const ytMatch = url.match(/youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_\-]+)/i);
@@ -80,7 +101,11 @@
             }
             return '[video]' + videoId + '[/video]';
         });
+
+        // Convert video tags
         html = html.replace(/<video[^>]*src=["']([^"']+)["'][^>]*>.*?<\/video>/gi, '[video]$1[/video]');
+
+        // Convert images (handle proxy URLs)
         html = html.replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, function(_, imgSrc) {
             const proxyMatch = imgSrc.match(/url=(.+)$/);
             if (proxyMatch) {
@@ -93,6 +118,8 @@
             }
             return '[img]' + imgSrc + '[/img]';
         });
+
+        // Convert HTML tags to BBCode
         return html
             .replace(/<b[^>]*>(.*?)<\/b>/gi, '[b]$1[/b]')
             .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '[b]$1[/b]')
@@ -112,20 +139,28 @@
             .trim();
     }
 
-    // Continuously remove placeholder (for dynamic frameworks like Alpine.js)
+    /**
+     * Removes placeholder attribute from chatbox (for Alpine.js compatibility)
+     * @param {HTMLElement} chatbox - Textarea element
+     */
     function removePlaceholder(chatbox) {
         if (chatbox && chatbox.getAttribute('placeholder')) {
             chatbox.removeAttribute('placeholder');
         }
     }
 
-    // Update live preview of BBCode
+    /**
+     * Updates the live BBCode preview area
+     * Converts BBCode to HTML and displays it
+     * @param {HTMLElement} chatbox - Textarea element
+     */
     function updatePreview(chatbox) {
         const previewArea = document.getElementById('bbCodePreviewArea');
         if (!previewArea) return;
 
         const val = chatbox.value.trim();
 
+        // Hide preview if empty
         if (!val) {
             previewArea.style.display = 'none';
             return;
@@ -133,11 +168,11 @@
 
         previewArea.style.display = 'block';
 
-        // Convert BBCode to HTML for preview - improved regex
+        // Convert BBCode to HTML for preview rendering
         let html = val
-            // [url=link]text[/url]
+            // [url=link]text[/url] format
             .replace(/\[url=([^\]]+?)\]([\s\S]+?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">$2</a>')
-            // [url]link[/url]
+            // [url]link[/url] format
             .replace(/\[url\]([^\[]+?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
             .replace(/\[b\]([\s\S]+?)\[\/b\]/gi, '<b>$1</b>')
             .replace(/\[i\]([\s\S]+?)\[\/i\]/gi, '<i>$1</i>')
@@ -145,6 +180,7 @@
             .replace(/\[color=([^\]]+?)\]([\s\S]+?)\[\/color\]/gi, '<span style="color:$1">$2</span>')
             .replace(/\[img\]([^\[]+?)\[\/img\]/gi, '<img src="$1" style="max-width:100%; max-height:200px; border-radius:4px; margin:5px 0;" />')
             .replace(/\[video\]([^\[]+?)\[\/video\]/gi, function(_, videoId) {
+                // Check if it's a YouTube video ID (11 characters)
                 if (videoId.match(/^[a-zA-Z0-9_\-]{11}$/)) {
                     return '<iframe width="280" height="157" src="https://www.youtube.com/embed/' + videoId + '" frameborder="0" allowfullscreen style="border-radius:4px; margin:5px 0;"></iframe>';
                 }
@@ -155,6 +191,12 @@
         previewArea.innerHTML = '<small style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Live Preview</small><br>' + html;
     }
 
+    /**
+     * Sets up the BBCode panel (preview + buttons)
+     * Creates preview area above textarea and buttons below
+     * @param {HTMLElement} chatbox - Textarea element
+     * @returns {boolean} - Success status
+     */
     function setupBBCodePanel(chatbox) {
         if (!chatbox) return false;
         if (document.getElementById('bbCodePreviewArea')) return true;
@@ -169,7 +211,7 @@
         buttonContainer.id = 'bbCodesPanel';
         buttonContainer.innerHTML = `
             <button type="button" class="bbc-btn" data-bbcode="[b][/b]" title="Bold">B</button>
-            <button type="button" class="bbc-btn" data-bbcode="[i][/i]" title="Italic">I</button>
+            <button type="button" class="bbc-btn bbc-btn-italic" data-bbcode="[i][/i]" title="Italic">/</button>
             <button type="button" class="bbc-btn" data-bbcode="[u][/u]" title="Underline">U</button>
             <button type="button" class="bbc-btn" data-bbcode="[img][/img]" title="Image">IMG</button>
             <button type="button" class="bbc-btn" data-bbcode="[url][/url]" title="URL">URL</button>
@@ -183,7 +225,6 @@
                 <span class="emoji" data-emoji="😂">😂</span>
                 <span class="emoji" data-emoji="🤣">🤣</span>
                 <span class="emoji" data-emoji="😊">😊</span>
-                <span class="emoji" data-emoji="😎">😎</span>
                 <span class="emoji" data-emoji="😎">😎</span>
                 <span class="emoji" data-emoji="😍">😍</span>
                 <span class="emoji" data-emoji="😘">😘</span>
@@ -203,11 +244,13 @@
         `;
         chatbox.parentNode.insertBefore(buttonContainer, chatbox.nextSibling);
 
+        // Attach click handlers to BBCode buttons
         buttonContainer.querySelectorAll('.bbc-btn[data-bbcode]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const bbCode = btn.getAttribute('data-bbcode');
                 if (!bbCode) return;
 
+                // Special handling for IMG and URL (use clipboard)
                 if (bbCode === '[img][/img]') {
                     insertImgBBCodeWithClipboard(bbCode, chatbox);
                 } else if (bbCode === '[url][/url]') {
@@ -218,6 +261,7 @@
             });
         });
 
+        // Color picker button
         const colorBtn = buttonContainer.querySelector('#colorButton');
         const picker = buttonContainer.querySelector('#colorPicker');
         colorBtn.addEventListener('click', () => picker.click());
@@ -229,6 +273,7 @@
             const selStart = chatbox.selectionStart;
             const selEnd = chatbox.selectionEnd;
 
+            // If text is selected, wrap it with color tag
             if (selStart !== undefined && selEnd !== undefined && selStart !== selEnd) {
                 const before = chatbox.value.substring(0, selStart);
                 const selected = chatbox.value.substring(selStart, selEnd);
@@ -237,6 +282,7 @@
                 chatbox.value = before + colorBBCode + after;
                 chatbox.setSelectionRange(before.length + colorBBCode.length, before.length + colorBBCode.length);
             } else {
+                // No selection, insert empty color tag
                 const pos = chatbox.selectionStart || chatbox.value.length;
                 const colorBBCode = `[color=${cssColorToHex(color)}][/color]`;
                 chatbox.value = chatbox.value.slice(0, pos) + colorBBCode + chatbox.value.slice(pos);
@@ -246,13 +292,16 @@
             updatePreview(chatbox);
         });
 
+        // Video button (uses clipboard)
         buttonContainer.querySelector('#videoButton').addEventListener('click', () => insertVideoBBCodeWithClipboard(chatbox));
 
+        // Emoji button toggle
         buttonContainer.querySelector('#emojiButton').addEventListener('click', () => {
             const menu = document.getElementById('emojiMenu');
             menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
         });
 
+        // Emoji selection
         buttonContainer.querySelector('#emojiMenu').addEventListener('click', e => {
             if (e.target.classList.contains('emoji')) {
                 insertEmoji(e.target.getAttribute('data-emoji'), chatbox);
@@ -260,6 +309,7 @@
             }
         });
 
+        // Close emoji menu when clicking outside
         document.addEventListener('click', e => {
             const menu = document.getElementById('emojiMenu');
             const btn = document.getElementById('emojiButton');
@@ -268,6 +318,7 @@
             }
         });
 
+        // Update preview on input/keyup/focus
         chatbox.addEventListener('input', () => {
             updatePreview(chatbox);
             removePlaceholder(chatbox);
@@ -275,6 +326,7 @@
         chatbox.addEventListener('keyup', () => updatePreview(chatbox));
         chatbox.addEventListener('focus', () => removePlaceholder(chatbox));
 
+        // Watch for placeholder attribute changes (Alpine.js)
         const placeholderObserver = new MutationObserver(() => {
             removePlaceholder(chatbox);
         });
@@ -286,6 +338,11 @@
         return true;
     }
 
+    /**
+     * Inserts emoji at cursor position
+     * @param {string} emoji - Emoji character
+     * @param {HTMLElement} chatbox - Textarea element
+     */
     function insertEmoji(emoji, chatbox) {
         const pos = chatbox.selectionStart || chatbox.value.length;
         chatbox.value = chatbox.value.substring(0, pos) + emoji + chatbox.value.substring(pos);
@@ -294,17 +351,24 @@
         updatePreview(chatbox);
     }
 
+    /**
+     * Inserts BBCode tags at cursor or wraps selected text
+     * @param {HTMLElement} chatbox - Textarea element
+     * @param {string} bbCode - BBCode pattern (e.g., "[b][/b]")
+     */
     function insertBBCode(chatbox, bbCode) {
         const textSelected = chatbox.value.substring(chatbox.selectionStart, chatbox.selectionEnd);
         const startTag = bbCode.substring(0, bbCode.indexOf(']') + 1);
         const endTag = bbCode.substring(bbCode.lastIndexOf('['));
 
         if (textSelected.length > 0) {
+            // Wrap selected text
             const newText = startTag + textSelected + endTag;
             chatbox.value = chatbox.value.substring(0, chatbox.selectionStart) + newText + ' ' + chatbox.value.substring(chatbox.selectionEnd);
             const newPos = chatbox.value.lastIndexOf(' ') + 1;
             chatbox.setSelectionRange(newPos, newPos);
         } else {
+            // Insert empty tags
             const pos = chatbox.selectionStart + startTag.length;
             chatbox.value += startTag + endTag + ' ';
             chatbox.setSelectionRange(pos, pos);
@@ -313,6 +377,11 @@
         updatePreview(chatbox);
     }
 
+    /**
+     * Inserts BBCode with clipboard content (for URL tags)
+     * @param {string} tag - BBCode tag pattern
+     * @param {HTMLElement} chatbox - Textarea element
+     */
     function insertBBCodeWithClipboard(tag, chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const newContent = clipText.trim().length > 0
@@ -322,12 +391,18 @@
             chatbox.focus();
             updatePreview(chatbox);
         }).catch(() => {
+            // Clipboard access denied, insert empty tag
             chatbox.value += tag.replace(/(\[.*?\])(.*?)(\[\/.*?\])/, `$1$2$3`) + ' ';
             chatbox.focus();
             updatePreview(chatbox);
         });
     }
 
+    /**
+     * Inserts image BBCode with clipboard content
+     * @param {string} tag - BBCode tag pattern
+     * @param {HTMLElement} chatbox - Textarea element
+     */
     function insertImgBBCodeWithClipboard(tag, chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const newContent = clipText.trim().length > 0
@@ -343,14 +418,22 @@
         });
     }
 
+    /**
+     * Inserts video BBCode with clipboard content
+     * Automatically extracts YouTube video ID from URLs
+     * @param {HTMLElement} chatbox - Textarea element
+     */
     function insertVideoBBCodeWithClipboard(chatbox) {
         navigator.clipboard.readText().then(clipText => {
             const ytLink = clipText.trim();
             let videoId = '';
 
+            // Extract video ID from youtu.be links
             if (ytLink.match(/^https:\/\/youtu\.be\//)) {
                 videoId = ytLink.split('/').pop();
-            } else if (ytLink.match(/youtube\.com\/watch\?v=/)) {
+            } 
+            // Extract video ID from youtube.com/watch?v= links
+            else if (ytLink.match(/youtube\.com\/watch\?v=/)) {
                 try {
                     const urlParams = new URLSearchParams((new URL(ytLink)).search);
                     videoId = urlParams.get('v') || '';
@@ -373,13 +456,21 @@
         });
     }
 
+    /**
+     * Adds reply buttons (@, reply, message, edit/gift) to each chat message
+     * Scans all chat messages and adds action buttons
+     */
     function addReplyButtonsEach() {
         const userSelf = extractUser();
+
+        // Remove existing buttons
         document.querySelectorAll('.enh-chat-btn-action').forEach(i => i.remove());
 
+        // Process each chat message
         document.querySelectorAll('address.chatbox-message__address.user-tag').forEach(address => {
             if (!address) return;
 
+            // Skip if buttons already added
             if (address.querySelector('.enh-chat-btn-action')) {
                 return;
             }
@@ -389,6 +480,8 @@
             if (!link || !span) return;
 
             let username = span.textContent.replace(/^\s*|\s*$/g, '').replace(/\s+/, '').trim();
+
+            // Skip bot messages
             const isBot = BOTNICKS.some(bot => bot.toLowerCase() === username.toLowerCase());
             if (!username || isBot) return;
 
@@ -398,6 +491,7 @@
             const contentSection = rootMsg.querySelector('.chatbox-message__content, section.bbcode-rendered');
             const contentText = contentSection ? contentSection.textContent.trim() : '';
 
+            // Detect user color
             let rawColor = '#ecc846';
             if (span && span.style && span.style.color && span.style.color !== '') {
                 rawColor = span.style.color;
@@ -409,12 +503,14 @@
                 } catch (e) { }
             }
 
+            // Use custom color if available
             if ((!rawColor || rawColor === 'inherit' || rawColor === '#ecc846') && USER_COLORS.hasOwnProperty(username)) {
                 rawColor = USER_COLORS[username];
             }
 
             let userColor = cssColorToHex(rawColor);
 
+            // @ Mention button
             const atBtn = document.createElement('button');
             atBtn.className = 'enh-chat-btn-action';
             atBtn.textContent = '@';
@@ -431,6 +527,7 @@
                 updatePreview(chatbox);
             };
 
+            // Reply button
             const reply = document.createElement('button');
             reply.className = 'enh-chat-btn-action';
             reply.textContent = '↩️';
@@ -448,6 +545,7 @@
                 updatePreview(chatbox);
             };
 
+            // Private message button
             const msg = document.createElement('button');
             msg.className = 'enh-chat-btn-action';
             msg.textContent = '✉️';
@@ -463,8 +561,10 @@
                 window.open(url, '_blank');
             };
 
+            // Edit button (own messages) or Gift button (other users)
             let additionalBtn;
             if (username === userSelf) {
+                // Edit button for own messages
                 additionalBtn = document.createElement('button');
                 additionalBtn.className = 'enh-chat-btn-action';
                 additionalBtn.title = 'Edit message';
@@ -490,6 +590,7 @@
                     updatePreview(chatbox);
                 };
             } else {
+                // Gift button for other users
                 additionalBtn = document.createElement('button');
                 additionalBtn.className = 'enh-chat-btn-action';
                 additionalBtn.textContent = '🎁';
@@ -508,6 +609,7 @@
                 };
             }
 
+            // Append all buttons to message
             address.appendChild(atBtn);
             address.appendChild(reply);
             address.appendChild(msg);
@@ -515,10 +617,18 @@
         });
     }
 
+    /**
+     * Creates and displays the gift dialog
+     * @param {string} token - CSRF token
+     * @param {string} user - Current user's username
+     * @param {string} username - Target user's username
+     */
     function addGiftDialog(token, user, username) {
+        // Remove existing dialog if present
         const existing = document.getElementById('gift-panel');
         if (existing) existing.remove();
 
+        // Create dialog panel
         const panel = document.createElement('div');
         panel.id = 'gift-panel';
         panel.innerHTML = `
@@ -537,6 +647,7 @@
         `;
         document.body.appendChild(panel);
 
+        // Add dialog styles
         const st = document.createElement('style');
         st.textContent = `
             #gift-panel {
@@ -616,11 +727,13 @@
         `;
         document.head.appendChild(st);
 
+        // Cancel button handler
         panel.querySelector('#cancel-gift-btn').onclick = function () {
             panel.remove();
             st.remove();
         };
 
+        // Form submit handler
         panel.querySelector('form').onsubmit = function (e) {
             e.preventDefault();
             const form = this;
@@ -644,6 +757,10 @@
         };
     }
 
+    /**
+     * Main initialization function
+     * Waits for chatbox to be available, then sets up everything
+     */
     function init() {
         let tryCount = 0;
         const check = setInterval(() => {
@@ -651,25 +768,32 @@
             const chat = document.querySelector('.chatroom__messages');
 
             if (chatbox && chat) {
+                // Remove placeholder continuously
                 removePlaceholder(chatbox);
                 setInterval(() => removePlaceholder(chatbox), 100);
 
+                // Setup BBCode panel
                 const ok = setupBBCodePanel(chatbox);
                 if (ok) {
                     clearInterval(check);
+
+                    // Add reply buttons to existing messages
                     addReplyButtonsEach();
 
+                    // Watch for new messages
                     const observer = new MutationObserver(() => addReplyButtonsEach());
                     observer.observe(chat, { childList: true });
                 }
             }
 
+            // Stop trying after 50 attempts (~40 seconds)
             if (++tryCount > 50) {
                 clearInterval(check);
             }
         }, 800);
     }
 
+    // Inject custom styles
     const styleFix = document.createElement('style');
     styleFix.innerHTML = `
         /* Keep textarea normal size like original */
@@ -745,6 +869,9 @@
             min-height: 24px;
             box-shadow: none;
             vertical-align: middle;
+        }
+        #bbCodesPanel .bbc-btn-italic {
+            font-style: italic;
         }
         #bbCodesPanel .bbc-btn:hover,
         #bbCodesPanel .bbc-btn:focus,
@@ -827,5 +954,6 @@
     `;
     document.head.appendChild(styleFix);
 
+    // Start initialization
     init();
 })();
